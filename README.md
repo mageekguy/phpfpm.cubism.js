@@ -4,7 +4,7 @@
 
 ![screenshot](/screenshot.png?raw=true)
 
-To use it, first, put contents of directories `js` and `css` file in a directory.--
+To use it, first, put contents of directories `js` and `css` file in a directory.  
 
 Second, in the `head` section of an HTML file, add:
 ```
