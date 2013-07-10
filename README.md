@@ -21,11 +21,11 @@ Third, in the `body` section of your HTML file, add:
 ```
 
 Moreover, you must enable PHP-FPM status page on your web server.  
-To do that, just give the value `/status` or whatever you want to the directive `pm.status_page` in your PHP-FPM configuration file.--
+To do that, just give the value `/status` or whatever you want to the directive `pm.status_page` in your PHP-FPM configuration file.  
 Do not omit to restart PHP-FPM!  
 
 At last, you should allow acces to your IP to `/status` in your web server.  
-With [nginx](http://wiki.nginx.org/Main), add in its configuration file:
+For [nginx](http://wiki.nginx.org/Main), add in its configuration file:
 ```
 location /status {
     fastcgi_pass 127.0.0.1:9000; # Or use an UNIX socket
