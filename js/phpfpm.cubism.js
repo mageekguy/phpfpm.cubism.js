@@ -95,6 +95,8 @@ phpfpm.monitoring = function(url, step, size) {
 		.size(size)
 	;
 
+	this.title = null;
+
 	this.context
 		.on("focus", function(i) {
 				d3.selectAll(".value").style("right", i == null ? null : size - i + "px");
@@ -112,19 +114,11 @@ phpfpm.monitoring = function(url, step, size) {
 		return this.context.metric(function(start, stop, step, callback) {
 				var values = [];
 
-				start = +start;
-
 				if (start >= monitoring.start) {
-					stop = +stop;
+					var value = monitoring.status.data[name];
 
-					while (start < stop) {
-						start += step;
-
-						var value = monitoring.status.get()[name];
-
-						if (value) {
-							values.push(value);
-						}
+					if (value) {
+						values.push(value);
 					}
 				}
 
@@ -140,19 +134,11 @@ phpfpm.monitoring = function(url, step, size) {
 		return this.context.metric(function(start, stop, step, callback) {
 				var values = [];
 
-				start = +start;
-
 				if (start >= monitoring.start) {
-					stop = +stop;
+					var value = monitoring.status.data[name] - monitoring.status.previousData[name];
 
-					while (start < stop) {
-						start += step;
-
-						var value = monitoring.status.get()[name] - monitoring.status.getPrevious()[name];
-
-						if (value) {
-							values.push(value);
-						}
+					if (value) {
+						values.push(value);
 					}
 				}
 
@@ -163,6 +149,12 @@ phpfpm.monitoring = function(url, step, size) {
 	};
 
 	this.getData = function() {
+		var data = this.monitoring.status.get();
+
+		if (this.title) {
+			this.title.text('Pool ' + data['pool'] + ' (' + data['process manager'] + ') started since ' + new Date(data['start time'] * 1000));
+		}
+
 		return [
 			this.getMetric('accepted conn', 'total conn'),
 			this.getDiffMetric('accepted conn', 'new conn'),
@@ -194,15 +186,10 @@ phpfpm.monitoring = function(url, step, size) {
 
 			target.attr('class', phpfpmCssClass);
 
-			var title = target
+			this.title = target
 				.append('h1')
 				.attr('class', 'title')
 			;
-
-			this.status.fetch(function(status) {
-					title.text('Pool ' + status.data['pool'] + ' (' + status.data['process manager'] + ') started since ' + new Date(status.data['start time'] * 1000));
-				}
-			);
 
 			var graphe = target
 				.append('div')
