@@ -26,6 +26,7 @@
 }
 
 .phpfpm .axis text {
+	transition: fill-opacity 250ms linear;
 	-webkit-transition: fill-opacity 250ms linear;
 }
 
