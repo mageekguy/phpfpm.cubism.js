@@ -37,4 +37,4 @@ location /status {
 }
 ```
 Do not omit to restart [nginx](http://wiki.nginx.org/Main)!  
-You can now open your HTML file in your HTTP brower, or upload it on a web server.
+You can now open your HTML file in your HTTP browser, or upload it on a web server.
