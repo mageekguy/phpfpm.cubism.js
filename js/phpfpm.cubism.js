@@ -41,11 +41,12 @@ phpfpm.status = function(url, delay) {
 	this.delay = delay;
 	this.data =  {};
 	this.previousData = {};
-	this.lastFetch = +(new Date());
+	this.lastFetch = null;
 	this.fetchNumber = 0;
 	this.fetchInProgress = false;
+	this.callback = null;
 
-	this.fetch = function(callback) {
+	this.fetch = function() {
 		if (!this.fetchInProgress) {
 			this.lastFetch = +(new Date());
 			this.fetchNumber++;
@@ -60,8 +61,8 @@ phpfpm.status = function(url, delay) {
 					status.data = data;
 					status.fetchInProgress = false;
 
-					if (callback) {
-						callback(status);
+					if (status.callback) {
+						status.callback(status);
 					}
 				}
 			);
@@ -73,7 +74,7 @@ phpfpm.status = function(url, delay) {
 	this.get = function() {
 		var now = +(new Date());
 
-		if ((this.lastFetch + this.delay) < now) {
+		if (!this.lastFetch || ((this.lastFetch + this.delay) < now)) {
 			this.fetch();
 		}
 
@@ -88,25 +89,18 @@ phpfpm.status = function(url, delay) {
 };
 
 phpfpm.monitoring = function(url, step, size) {
+	this.start = +(new Date());
+	this.status = phpfpm.status(url, step);
 	this.context = cubism.context()
 		.serverDelay(0)
 		.clientDelay(0)
 		.step(step)
 		.size(size)
-	;
-
-	this.title = null;
-
-	this.context
 		.on("focus", function(i) {
 				d3.selectAll(".value").style("right", i == null ? null : size - i + "px");
 			}
 		)
 	;
-
-	this.start = +(new Date());
-
-	this.status = phpfpm.status(url, step);
 
 	this.getMetric = function(name, metricName) {
 		var monitoring = this;
@@ -114,11 +108,19 @@ phpfpm.monitoring = function(url, step, size) {
 		return this.context.metric(function(start, stop, step, callback) {
 				var values = [];
 
-				if (start >= monitoring.start) {
-					var value = monitoring.status.data[name];
+				start = +start;
 
-					if (value) {
-						values.push(value);
+				if (start >= monitoring.start) {
+					stop = +stop;
+
+					while (start < stop) {
+						start += step;
+
+						var value = monitoring.status.get()[name];
+
+						if (value) {
+							values.push(value);
+						}
 					}
 				}
 
@@ -134,11 +136,19 @@ phpfpm.monitoring = function(url, step, size) {
 		return this.context.metric(function(start, stop, step, callback) {
 				var values = [];
 
-				if (start >= monitoring.start) {
-					var value = monitoring.status.data[name] - monitoring.status.previousData[name];
+				start = +start;
 
-					if (value) {
-						values.push(value);
+				if (start >= monitoring.start) {
+					stop = +stop;
+
+					while (start < stop) {
+						start += step;
+
+						var value = monitoring.status.get()[name] - monitoring.status.getPrevious()[name];
+
+						if (value) {
+							values.push(value);
+						}
 					}
 				}
 
@@ -149,12 +159,6 @@ phpfpm.monitoring = function(url, step, size) {
 	};
 
 	this.getData = function() {
-		var data = this.monitoring.status.get();
-
-		if (this.title) {
-			this.title.text('Pool ' + data['pool'] + ' (' + data['process manager'] + ') started since ' + new Date(data['start time'] * 1000));
-		}
-
 		return [
 			this.getMetric('accepted conn', 'total conn'),
 			this.getDiffMetric('accepted conn', 'new conn'),
@@ -186,10 +190,17 @@ phpfpm.monitoring = function(url, step, size) {
 
 			target.attr('class', phpfpmCssClass);
 
-			this.title = target
+			var title = target
 				.append('h1')
 				.attr('class', 'title')
 			;
+
+
+			this.status.callback = function(status) {
+				title.text('Pool ' + status.data['pool'] + ' (' + status.data['process manager'] + ') started since ' + new Date(status.data['start time'] * 1000));
+			};
+
+			this.status.fetch();
 
 			var graphe = target
 				.append('div')
