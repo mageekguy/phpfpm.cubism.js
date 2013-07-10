@@ -42,21 +42,30 @@ phpfpm.status = function(url, delay) {
 	this.data =  {};
 	this.previousData = {};
 	this.lastFetch = +(new Date());
+	this.fetchNumber = 0;
+	this.fetchInProgress = false;
 
 	this.fetch = function(callback) {
-		this.lastFetch = +(new Date());
+		if (!this.fetchInProgress) {
+			this.lastFetch = +(new Date());
+			this.fetchNumber++;
+			this.fetchInProgress = true;
 
-		var status = this;
+			var status = this;
 
-		d3.json(this.url, function(data) {
-				status.previousData = status.data;
-				status.data = data;
+			d3.json(this.url, function(data) {
+					data['accepted conn'] -= status.fetchNumber;
 
-				if (callback) {
-					callback(status);
+					status.previousData = status.data;
+					status.data = data;
+					status.fetchInProgress = false;
+
+					if (callback) {
+						callback(status);
+					}
 				}
-			}
-		);
+			);
+		}
 
 		return this;
 	}
