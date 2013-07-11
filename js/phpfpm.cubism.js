@@ -54,11 +54,18 @@ phpfpm.status = function(url, delay) {
 
 			var status = this;
 
-			d3.json(this.url, function(data) {
-					data['accepted conn'] -= status.fetchNumber;
+			d3.json(this.url, function(error, data) {
+					if (!error) {
+						if (status.previousData['accepted conn'] && data['accepted conn'] < status.previousData['accepted conn']) {
+							status.fetchNumber = 1;
+						}
 
-					status.previousData = status.data;
-					status.data = data;
+						data['accepted conn'] -= status.fetchNumber;
+
+						status.previousData = status.data;
+						status.data = data;
+					}
+
 					status.fetchInProgress = false;
 
 					if (status.callback) {
