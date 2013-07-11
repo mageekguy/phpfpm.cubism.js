@@ -37,4 +37,6 @@ location /status {
 }
 ```
 Do not omit to restart [nginx](http://wiki.nginx.org/Main)!  
+You can also used the file `index.hml` which is in this repository.  
+It works out of the box, just replace the string `http://your.domain.here/status` with your PHP-FPM status URL.  
 You can now open your HTML file in your HTTP browser, or upload it on a web server.
