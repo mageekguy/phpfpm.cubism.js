@@ -41,10 +41,12 @@ phpfpm.status = function(url, delay) {
 	this.delay = delay;
 	this.data =  {};
 	this.previousData = {};
+	this.backupOnError = {};
 	this.lastFetch = null;
 	this.fetchNumber = 0;
 	this.fetchInProgress = false;
 	this.callback = null;
+	this.error = null;
 
 	this.fetch = function() {
 		if (!this.fetchInProgress) {
@@ -55,22 +57,33 @@ phpfpm.status = function(url, delay) {
 			var status = this;
 
 			d3.json(this.url, function(error, data) {
-					if (!error) {
+					if (error) {
+						status.error = error;
+						status.backupOnError = status.previousData;
+						status.previousData = {};
+						status.data = {};
+					} else {
+						if (!status.error) {
+							status.previousData = status.data;
+						} else {
+							status.error = null;
+							status.previousData = status.backupOnError;
+							status.backupOnError = {};
+						}
+
 						if (status.previousData['accepted conn'] && data['accepted conn'] < status.previousData['accepted conn']) {
 							status.fetchNumber = 1;
 						}
 
-						data['accepted conn'] -= status.fetchNumber;
-
-						status.previousData = status.data;
 						status.data = data;
+						status.data['accepted conn'] -= status.fetchNumber;
+
+						if (status.callback) {
+							status.callback(status);
+						}
 					}
 
 					status.fetchInProgress = false;
-
-					if (status.callback) {
-						status.callback(status);
-					}
 				}
 			);
 		}
@@ -244,6 +257,8 @@ phpfpm.monitoring = function(url, step, size) {
 				)
 			;
 		}
+
+		return this;
 	}
 
 	return this;
