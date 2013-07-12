@@ -41,7 +41,7 @@ phpfpm.status = function(url, delay) {
 	this.delay = delay;
 	this.data =  {};
 	this.previousData = {};
-	this.backupOnError = {};
+	this.dataBeforeError = {};
 	this.lastFetch = null;
 	this.fetchNumber = 0;
 	this.fetchInProgress = false;
@@ -59,7 +59,7 @@ phpfpm.status = function(url, delay) {
 			d3.json(this.url, function(error, data) {
 					if (error) {
 						status.error = error;
-						status.backupOnError = status.previousData;
+						status.dataBeforeError = status.data;
 						status.previousData = {};
 						status.data = {};
 					} else {
@@ -67,8 +67,8 @@ phpfpm.status = function(url, delay) {
 							status.previousData = status.data;
 						} else {
 							status.error = null;
-							status.previousData = status.backupOnError;
-							status.backupOnError = {};
+							status.previousData = status.dataBeforeError;
+							status.dataBeforeError = {};
 						}
 
 						if (status.previousData['accepted conn'] && data['accepted conn'] < status.previousData['accepted conn']) {
@@ -78,9 +78,10 @@ phpfpm.status = function(url, delay) {
 						status.data = data;
 						status.data['accepted conn'] -= status.fetchNumber;
 
-						if (status.callback) {
-							status.callback(status);
-						}
+					}
+
+					if (status.callback) {
+						status.callback(status);
 					}
 
 					status.fetchInProgress = false;
@@ -108,18 +109,54 @@ phpfpm.status = function(url, delay) {
 	return this;
 };
 
-phpfpm.monitoring = function(url, step, size) {
+phpfpm.message = function(target, cssClass) {
+	this.target = target;
+	this.cssClass = cssClass;
+	this.container = null;
+
+	this.show = function(message) {
+		if (!this.container) {
+			this.container = this.target
+				.append('div')
+					.attr('class', this.cssClass)
+					.style('position', 'absolute')
+					.style('top', 0)
+					.style('left', 0)
+					.style('width', this.target.style('width'))
+					.style('height', this.target.style('height'))
+					.style('line-height', this.target.style('height'))
+					.style('z-index', 1)
+			;
+		}
+
+		this.container.text(message);
+
+		return this;
+	};
+
+	this.hide = function() {
+		if (this.container) {
+			this.container.remove();
+			this.container = null;
+		}
+
+		return this;
+	}
+
+	return this;
+};
+
+phpfpm.monitoring = function(url, step) {
+	if (!step) {
+		step = 1000;
+	}
+
 	this.start = +(new Date());
 	this.status = phpfpm.status(url, step);
 	this.context = cubism.context()
 		.serverDelay(0)
 		.clientDelay(0)
 		.step(step)
-		.size(size)
-		.on("focus", function(i) {
-				d3.selectAll(".value").style("right", i == null ? null : size - i + "px");
-			}
-		)
 	;
 
 	this.getMetric = function(name, metricName) {
@@ -181,7 +218,7 @@ phpfpm.monitoring = function(url, step, size) {
 	this.getData = function() {
 		return [
 			this.getMetric('accepted conn', 'total conn'),
-			this.getDiffMetric('accepted conn', 'new conn'),
+			this.getDiffMetric('accepted conn', '~ total conn'),
 			this.getMetric('active processes'),
 			this.getDiffMetric('active processes', '~ active processes'),
 			this.getMetric('idle processes'),
@@ -197,40 +234,57 @@ phpfpm.monitoring = function(url, step, size) {
 	};
 
 	this.display = function(target, cssClass) {
-		this.start = +(new Date());
-
 		target = d3.select(target);
 
 		if (target) {
+			this.start = +(new Date());
+
+			var size = parseInt(target.style('width'), 10);
+
+			this.context
+				.size(size)
+				.on("focus", function(i) {
+						d3.selectAll(".value").style("right", i == null ? null : size - i + "px");
+					}
+				)
+			;
+
 			var phpfpmCssClass = 'phpfpm';
 
 			if (cssClass) {
 				phpfpmCssClass += ' ' + cssClass;
 			}
 
-			target.attr('class', phpfpmCssClass);
+			target
+				.attr('class', phpfpmCssClass)
+				.attr('position', 'relative')
+			;
 
 			var title = target
 				.append('h1')
 				.attr('class', 'title')
 			;
 
+			var error = phpfpm.message(target, 'error');
 
 			this.status.callback = function(status) {
-				title.text('Pool ' + status.data['pool'] + ' (' + status.data['process manager'] + ') started since ' + new Date(status.data['start time'] * 1000));
+				if (status.error) {
+					error.show('Error: ' + status.error);
+				} else {
+					error.hide();
+
+					title.text('Pool ' + status.data['pool'] + ' (' + status.data['process manager'] + ') started since ' + new Date(status.data['start time'] * 1000));
+				}
 			};
 
 			this.status.fetch();
 
-			var graphe = target
-				.append('div')
-				.attr('class', 'graphe')
-			;
-
 			var monitoring = this;
 
-			graphe
-				.call(function(target) {
+			target
+				.append('div')
+				.attr('class', 'graphe')
+				.call(function(graphe) {
 						graphe.append('div')
 							.attr('class', 'axis')
 							.call(monitoring.context.axis().orient('top'))
@@ -242,9 +296,7 @@ phpfpm.monitoring = function(url, step, size) {
 								.append('div')
 									.attr('class', function(d) { return 'horizon ' + d.toString().replace(/\s+/g, ''); })
 									.call(function(horizon) {
-											var horizon = monitoring.context.horizon().format(d3.format('d')).colors([ '#0d58f1', '#568bf5', '#9fbdfa', '#e8effe', '#feefe8', '#fabd9f', '#f58b56', '#f1580d' ])(horizon);
-
-											return horizon;
+											return monitoring.context.horizon().format(d3.format('d')).colors([ '#0d58f1', '#568bf5', '#9fbdfa', '#e8effe', '#feefe8', '#fabd9f', '#f58b56', '#f1580d' ])(horizon);
 										}
 									)
 						;
